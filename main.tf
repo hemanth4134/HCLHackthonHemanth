@@ -2,54 +2,49 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# Create VPC
+# VPC
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
-
   tags = {
     Name = "main-vpc-hemanth"
   }
 }
 
-# Create Internet Gateway
+# Internet Gateway
 resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.main.id
-
   tags = {
     Name = "main-gateway-phk"
   }
 }
 
-# Create Public Subnet 1 (AZ a)
+# Public Subnet 1
 resource "aws_subnet" "public_1" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"
   availability_zone       = "us-east-1a"
   map_public_ip_on_launch = true
-
   tags = {
     Name = "public-subnet-1-phk"
   }
 }
 
-# Create Public Subnet 2 (AZ b)
+# Public Subnet 2
 resource "aws_subnet" "public_2" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.2.0/24"
   availability_zone       = "us-east-1b"
   map_public_ip_on_launch = true
-
   tags = {
     Name = "public-subnet-2-phk"
   }
 }
 
-# Create Private Subnet
+# Private Subnet (optional for later)
 resource "aws_subnet" "private" {
-  vpc_id     = aws_vpc.main.id
-  cidr_block = "10.0.3.0/24"
-  availability_zone = "us-east-1a"
-
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.3.0/24"
+  availability_zone       = "us-east-1a"
   tags = {
     Name = "private-subnet-phk"
   }
@@ -58,18 +53,16 @@ resource "aws_subnet" "private" {
 # Public Route Table
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
-
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.gw.id
   }
-
   tags = {
     Name = "public-route-table-phk"
   }
 }
 
-# Associate Public Subnets with Route Table
+# Associate Route Table to Public Subnets
 resource "aws_route_table_association" "public_assoc_1" {
   subnet_id      = aws_subnet.public_1.id
   route_table_id = aws_route_table.public.id
@@ -80,24 +73,21 @@ resource "aws_route_table_association" "public_assoc_2" {
   route_table_id = aws_route_table.public.id
 }
 
-# Security Group for ECS and Load Balancer
+# Security Group
 resource "aws_security_group" "ecs_sg" {
   vpc_id = aws_vpc.main.id
-
   ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
   tags = {
     Name = "ecs-sg-phk"
   }
@@ -108,10 +98,9 @@ resource "aws_ecs_cluster" "main" {
   name = "hemanth-fargate-cluster"
 }
 
-# IAM Role for ECS Task Execution
+# IAM Role for Task Execution
 resource "aws_iam_role" "ecs_task_exec_role" {
   name = "ecsTaskExecutionRolephk"
-
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
@@ -138,50 +127,47 @@ resource "aws_ecs_task_definition" "app" {
   memory                   = "512"
   execution_role_arn       = aws_iam_role.ecs_task_exec_role.arn
 
-  container_definitions = jsonencode([
-    {
-      name      = "nginx-container",
-      image     = "nginx",
-      portMappings = [{
-        containerPort = 80,
-        hostPort      = 80,
-        protocol      = "tcp"
-      }]
-    }
-  ])
+  container_definitions = jsonencode([{
+    name      = "nginx-container",
+    image     = "nginx",
+    portMappings = [{
+      containerPort = 80,
+      hostPort      = 80,
+      protocol      = "tcp"
+    }]
+  }])
 }
 
-# Application Load Balancer
+# Load Balancer
 resource "aws_lb" "app_lb" {
   name               = "ecs-app-lb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.ecs_sg.id]
-
-  subnets = [
-    aws_subnet.public_1.id,
-    aws_subnet.public_2.id
-  ]
-
+  subnets            = [aws_subnet.public_1.id, aws_subnet.public_2.id]
   enable_deletion_protection = false
-
   tags = {
     Environment = "dev"
   }
 }
 
 # Target Group
+resource "aws_lb_target_group" "app_tg" {
+  name        = "ecs-app-tg"
+  port        = 80
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = aws_vpc.main.id
 
-
- # health_check {
-  #  path                = "/"
-   # interval            = 30
- #   timeout             = 5
-  #  healthy_threshold   = 2
-  #  unhealthy_threshold = 2
-  #  matcher             = "200"
-  #}
-#}
+  health_check {
+    path                = "/"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    matcher             = "200"
+  }
+}
 
 # Listener
 resource "aws_lb_listener" "app_listener" {
@@ -195,7 +181,7 @@ resource "aws_lb_listener" "app_listener" {
   }
 }
 
-# ECS Service with Load Balancer
+# ECS Service
 resource "aws_ecs_service" "service" {
   name            = "fargate-service"
   cluster         = aws_ecs_cluster.main.id
