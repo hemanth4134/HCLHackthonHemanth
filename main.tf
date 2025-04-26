@@ -1,56 +1,146 @@
-name: Deploy to AWS with Terraform
+provider "aws" {
+  region = "us-east-1" # Change this to your preferred region
+}
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+# Create VPC
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
 
-jobs:
-  terraform:
-    name: Terraform AWS Deploy
-    runs-on: ubuntu-latest
+  tags = {
+    Name = "main-vpc-hemanth"
+  }
+}
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+# Create Internet Gateway
+resource "aws_internet_gateway" "gw" {
+  vpc_id = aws_vpc.main.id
 
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_wrapper: false
+  tags = {
+    Name = "main-gatewayphk"
+  }
+}
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+# Create Public Subnet
+resource "aws_subnet" "public" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.1.0/24"
+  map_public_ip_on_launch = true
 
-      - name: Terraform Init
-        run: terraform init
+  tags = {
+    Name = "public-subnetphk"
+  }
+}
 
-      - name: Terraform Validate
-        run: terraform validate
+# Create Private Subnet
+resource "aws_subnet" "private" {
+  vpc_id     = aws_vpc.main.id
+  cidr_block = "10.0.2.0/24"
 
-      - name: Terraform Plan
-        run: terraform plan -out=tfplan
+  tags = {
+    Name = "private-subnetphk"
+  }
+}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+# Create Public Route Table
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
 
-      - name: Set image variables
-        run: echo "IMAGE_URI=539935451710.dkr.ecr.us-east-1.amazonaws.com/hcldemo:mutable" >> $GITHUB_ENV
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.gw.id
+  }
 
-      - name: Build Docker image
-        run: docker build -t $IMAGE_URI -f "${{ env.DockerFilePath || 'Dockerfile' }}" .
+  tags = {
+    Name = "public-route-tablephk"
+  }
+}
 
-      - name: Push Docker image to ECR
-        run: docker push $IMAGE_URI
+# Associate Public Subnet with Route Table
+resource "aws_route_table_association" "public_assoc" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
+}
 
-      - name: Terraform Apply
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: terraform apply -auto-approve tfplan
+# Security Group
+resource "aws_security_group" "ecs_sg" {
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# ECS Cluster
+resource "aws_ecs_cluster" "main" {
+  name = "Hemanth-fargate-cluster"
+}
+
+# IAM Role for Fargate task
+resource "aws_iam_role" "ecs_task_exec_role" {
+  name = "ecsTaskExecutionRole"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Principal = {
+        Service = "ecs-tasks.amazonaws.com"
+      },
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_exec_attach" {
+  role       = aws_iam_role.ecs_task_exec_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+# Task Definition
+resource "aws_ecs_task_definition" "app" {
+  family                   = "fargate-task"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.ecs_task_exec_role.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "hello-app-hemanth",
+      image     = "nginx",
+      portMappings = [{
+        containerPort = 80,
+        hostPort      = 80,
+        protocol      = "tcp"
+      }]
+    }
+  ])
+}
+
+# ECS Service
+resource "aws_ecs_service" "app_service" {
+  name            = "fargate-service"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.app.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets         = [aws_subnet.public.id]
+    security_groups = [aws_security_group.ecs_sg.id]
+    assign_public_ip = true
+  }
+
+  depends_on = [aws_iam_role_policy_attachment.ecs_exec_attach]
+}
