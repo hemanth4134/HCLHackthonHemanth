@@ -1,5 +1,5 @@
 FROM node:18
-WORKDIR /app
+WORKDIR /phk_app
 COPY . .
 RUN npm install
 CMD ["npm", "start"]
