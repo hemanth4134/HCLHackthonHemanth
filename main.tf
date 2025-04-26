@@ -104,7 +104,7 @@ resource "aws_iam_role" "ecs_task_exec_role" {
 
 resource "aws_iam_role_policy_attachment" "ecs_exec_attach" {
   role       = aws_iam_role.ecs_task_exec_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+  policy_arn = "arn:aws:iam::aws:policy/phk-role/AmazonECSTaskExecutionRolePolicy"
 }
 
 # -------------------------
@@ -112,11 +112,11 @@ resource "aws_iam_role_policy_attachment" "ecs_exec_attach" {
 # -------------------------
 
 resource "aws_ecr_repository" "appointment_service" {
-  name = "appointment-service"
+  name = "appointment-phk"
 }
 
 resource "aws_ecr_repository" "patient_service" {
-  name = "patient-service"
+  name = "patient-phk"
 }
 
 # -------------------------
@@ -127,8 +127,8 @@ resource "null_resource" "docker_build_and_push_appointment_service" {
   provisioner "local-exec" {
     command = <<EOT
       aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${aws_ecr_repository.appointment_service.repository_url}
-      docker build -t appointment-service ./appointment-service
-      docker tag appointment-service:latest ${aws_ecr_repository.appointment_service.repository_url}:latest
+      docker build -t appointment-phk ./appointment-phk
+      docker tag appointment-phk:latest ${aws_ecr_repository.appointment_service.repository_url}:latest
       docker push ${aws_ecr_repository.appointment_service.repository_url}:latest
     EOT
   }
@@ -138,8 +138,8 @@ resource "null_resource" "docker_build_and_push_patient_service" {
   provisioner "local-exec" {
     command = <<EOT
       aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${aws_ecr_repository.patient_service.repository_url}
-      docker build -t patient-service ./patient-service
-      docker tag patient-service:latest ${aws_ecr_repository.patient_service.repository_url}:latest
+      docker build -t patient-phk ./patient-phk
+      docker tag patient-phk:latest ${aws_ecr_repository.patient_service.repository_url}:latest
       docker push ${aws_ecr_repository.patient_service.repository_url}:latest
     EOT
   }
@@ -150,7 +150,7 @@ resource "null_resource" "docker_build_and_push_patient_service" {
 # -------------------------
 
 resource "aws_ecs_task_definition" "appointment_service_task" {
-  family                   = "appointment-service-task"
+  family                   = "appointment-phk-task"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
@@ -158,7 +158,7 @@ resource "aws_ecs_task_definition" "appointment_service_task" {
   execution_role_arn       = aws_iam_role.ecs_task_exec_role.arn
 
   container_definitions = jsonencode([{
-    name  = "appointment-service-container",
+    name  = "appointment-phk-container",
     image = "${aws_ecr_repository.appointment_service.repository_url}:latest",
     portMappings = [{ containerPort = 3001, protocol = "tcp" }]
   }])
@@ -167,7 +167,7 @@ resource "aws_ecs_task_definition" "appointment_service_task" {
 }
 
 resource "aws_ecs_task_definition" "patient_service_task" {
-  family                   = "patient-service-task"
+  family                   = "patient-phk-task"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
@@ -175,7 +175,7 @@ resource "aws_ecs_task_definition" "patient_service_task" {
   execution_role_arn       = aws_iam_role.ecs_task_exec_role.arn
 
   container_definitions = jsonencode([{
-    name  = "patient-service-container",
+    name  = "patient-phk-container",
     image = "${aws_ecr_repository.patient_service.repository_url}:latest",
     portMappings = [{ containerPort = 3002, protocol = "tcp" }]
   }])
@@ -227,7 +227,7 @@ resource "aws_lb_listener" "http" {
 # -------------------------
 
 resource "aws_ecs_service" "appointment_service" {
-  name            = "appointment-service"
+  name            = "appointment-phk"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.appointment_service_task.arn
   desired_count   = 1
@@ -241,13 +241,13 @@ resource "aws_ecs_service" "appointment_service" {
 
   load_balancer {
     target_group_arn = aws_lb_target_group.appointment_service_tg.arn
-    container_name   = "appointment-service-container"
+    container_name   = "appointment-phk-container"
     container_port   = 3001
   }
 }
 
 resource "aws_ecs_service" "patient_service" {
-  name            = "patient-service"
+  name            = "patient-phk"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.patient_service_task.arn
   desired_count   = 1
@@ -261,7 +261,7 @@ resource "aws_ecs_service" "patient_service" {
 
   load_balancer {
     target_group_arn = aws_lb_target_group.patient_service_tg.arn
-    container_name   = "patient-service-container"
+    container_name   = "patient-phk-container"
     container_port   = 3002
   }
 }
