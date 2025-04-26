@@ -43,7 +43,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Set image variables
-        run: echo "IMAGE_URI=720682856456.dkr.ecr.us-east-1.amazonaws.com/hcldemo:mutable" >> $GITHUB_ENV
+        run: echo "IMAGE_URI=539935451710.dkr.ecr.us-east-1.amazonaws.com/hcldemo:mutable" >> $GITHUB_ENV
 
       - name: Build Docker image
         run: docker build -t $IMAGE_URI -f "${{ env.DockerFilePath || 'Dockerfile' }}" .
