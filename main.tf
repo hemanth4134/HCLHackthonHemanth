@@ -215,12 +215,12 @@ resource "null_resource" "docker_build_and_push" {
   provisioner "local-exec" {
     command = <<EOT
       aws ecr get-login-password --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com
-      docker build -t app .
-      docker tag my-app:latest ${aws_ecr_repository.app.repository_url}:latest
-      docker push ${aws_ecr_repository.app.repository_url}:latest
+      docker build -t phk_app .
+      docker tag phk_app:latest ${aws_ecr_repository.app.repository_url}:latest
+      docker push ${aws_ecr_repository.phk_app.repository_url}:latest
     EOT
   }
 
-  depends_on = [aws_ecr_repository.my_app]
+  depends_on = [aws_ecr_repository.phk_app]
 }
 
