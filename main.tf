@@ -8,16 +8,12 @@ provider "aws" {
 
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
-  tags = {
-    Name = "main-vpc-hemanthfinal"
-  }
+  tags = { Name = "main-vpc-hemanthfinal" }
 }
 
 resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.main.id
-  tags = {
-    Name = "main-gateway-hemanthfinal"
-  }
+  tags = { Name = "main-gateway-hemanthfinal" }
 }
 
 resource "aws_subnet" "public_1" {
@@ -25,9 +21,7 @@ resource "aws_subnet" "public_1" {
   cidr_block              = "10.0.1.0/24"
   availability_zone       = "us-east-1a"
   map_public_ip_on_launch = true
-  tags = {
-    Name = "public-subnet-1-hemanthfinal"
-  }
+  tags = { Name = "public-subnet-1-hemanthfinal" }
 }
 
 resource "aws_subnet" "public_2" {
@@ -35,18 +29,7 @@ resource "aws_subnet" "public_2" {
   cidr_block              = "10.0.2.0/24"
   availability_zone       = "us-east-1b"
   map_public_ip_on_launch = true
-  tags = {
-    Name = "public-subnet-2-hemanthfinal"
-  }
-}
-
-resource "aws_subnet" "private" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.3.0/24"
-  availability_zone = "us-east-1a"
-  tags = {
-    Name = "private-subnet-hemanthfinal"
-  }
+  tags = { Name = "public-subnet-2-hemanthfinal" }
 }
 
 resource "aws_route_table" "public" {
@@ -57,9 +40,7 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.gw.id
   }
 
-  tags = {
-    Name = "public-route-table-hemanthfinal"
-  }
+  tags = { Name = "public-route-table-hemanthfinal" }
 }
 
 resource "aws_route_table_association" "public_assoc_1" {
@@ -73,15 +54,15 @@ resource "aws_route_table_association" "public_assoc_2" {
 }
 
 # -------------------------
-# ECS Networking
+# ECS Networking (Security Group)
 # -------------------------
 
 resource "aws_security_group" "ecs_sg" {
   vpc_id = aws_vpc.main.id
 
   ingress {
-    from_port   = 80
-    to_port     = 80
+    from_port   = 0
+    to_port     = 0
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -93,17 +74,19 @@ resource "aws_security_group" "ecs_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = {
-    Name = "ecs-sg-hemanthfinal"
-  }
+  tags = { Name = "ecs-sg-hemanthfinal" }
 }
+
+# -------------------------
+# ECS Cluster
+# -------------------------
 
 resource "aws_ecs_cluster" "main" {
   name = "hemanth-fargate-cluster"
 }
 
 # -------------------------
-# IAM Roles
+# IAM Role for ECS Tasks
 # -------------------------
 
 resource "aws_iam_role" "ecs_task_exec_role" {
@@ -113,9 +96,7 @@ resource "aws_iam_role" "ecs_task_exec_role" {
     Version = "2012-10-17",
     Statement = [{
       Effect = "Allow",
-      Principal = {
-        Service = "ecs-tasks.amazonaws.com"
-      },
+      Principal = { Service = "ecs-tasks.amazonaws.com" },
       Action = "sts:AssumeRole"
     }]
   })
@@ -127,36 +108,49 @@ resource "aws_iam_role_policy_attachment" "ecs_exec_attach" {
 }
 
 # -------------------------
-# ECR (Elastic Container Registry)
+# ECR Repositories
 # -------------------------
 
-resource "aws_ecr_repository" "phk_app" {
-  name = "phk-app"
+resource "aws_ecr_repository" "appointment_service" {
+  name = "appointment-service"
 }
 
-data "aws_caller_identity" "current" {}
+resource "aws_ecr_repository" "patient_service" {
+  name = "patient-service"
+}
 
-data "aws_region" "current" {}
+# -------------------------
+# Build and Push Docker Images
+# -------------------------
 
-resource "null_resource" "docker_build_and_push" {
+resource "null_resource" "docker_build_and_push_appointment_service" {
   provisioner "local-exec" {
     command = <<EOT
-      aws ecr get-login-password --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com
-      docker build -t phk-app .
-      docker tag phk-app:latest ${aws_ecr_repository.phk_app.repository_url}:latest
-      docker push ${aws_ecr_repository.phk_app.repository_url}:latest
+      aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${aws_ecr_repository.appointment_service.repository_url}
+      docker build -t appointment-service ./appointment-service
+      docker tag appointment-service:latest ${aws_ecr_repository.appointment_service.repository_url}:latest
+      docker push ${aws_ecr_repository.appointment_service.repository_url}:latest
     EOT
   }
+}
 
-  depends_on = [aws_ecr_repository.phk_app]
+resource "null_resource" "docker_build_and_push_patient_service" {
+  provisioner "local-exec" {
+    command = <<EOT
+      aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${aws_ecr_repository.patient_service.repository_url}
+      docker build -t patient-service ./patient-service
+      docker tag patient-service:latest ${aws_ecr_repository.patient_service.repository_url}:latest
+      docker push ${aws_ecr_repository.patient_service.repository_url}:latest
+    EOT
+  }
 }
 
 # -------------------------
-# ECS Task Definition
+# ECS Task Definitions
 # -------------------------
 
-resource "aws_ecs_task_definition" "app" {
-  family                   = "fargate-task-hemanth"
+resource "aws_ecs_task_definition" "appointment_service_task" {
+  family                   = "appointment-service-task"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
@@ -164,71 +158,78 @@ resource "aws_ecs_task_definition" "app" {
   execution_role_arn       = aws_iam_role.ecs_task_exec_role.arn
 
   container_definitions = jsonencode([{
-    name      = "phk-app-container",
-    image     = "${aws_ecr_repository.phk_app.repository_url}:latest",
-    portMappings = [{
-      containerPort = 80,
-      hostPort      = 80,
-      protocol      = "tcp"
-    }]
+    name  = "appointment-service-container",
+    image = "${aws_ecr_repository.appointment_service.repository_url}:latest",
+    portMappings = [{ containerPort = 3001, protocol = "tcp" }]
   }])
 
-  depends_on = [null_resource.docker_build_and_push]
+  depends_on = [null_resource.docker_build_and_push_appointment_service]
+}
+
+resource "aws_ecs_task_definition" "patient_service_task" {
+  family                   = "patient-service-task"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.ecs_task_exec_role.arn
+
+  container_definitions = jsonencode([{
+    name  = "patient-service-container",
+    image = "${aws_ecr_repository.patient_service.repository_url}:latest",
+    portMappings = [{ containerPort = 3002, protocol = "tcp" }]
+  }])
+
+  depends_on = [null_resource.docker_build_and_push_patient_service]
 }
 
 # -------------------------
 # Load Balancer
 # -------------------------
 
-resource "aws_lb" "app_lb" {
+resource "aws_lb" "main" {
   name               = "ecs-app-lb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.ecs_sg.id]
   subnets            = [aws_subnet.public_1.id, aws_subnet.public_2.id]
-  enable_deletion_protection = false
-
-  tags = {
-    Environment = "dev"
-  }
 }
 
-resource "aws_lb_target_group" "app_tg" {
-  name        = "ecs-app-tg"
-  port        = 80
+resource "aws_lb_target_group" "appointment_service_tg" {
+  name        = "appointment-tg"
+  port        = 3001
   protocol    = "HTTP"
   target_type = "ip"
   vpc_id      = aws_vpc.main.id
-
-  health_check {
-    path                = "/"
-    interval            = 30
-    timeout             = 5
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-    matcher             = "200"
-  }
 }
 
-resource "aws_lb_listener" "app_listener" {
-  load_balancer_arn = aws_lb.app_lb.arn
+resource "aws_lb_target_group" "patient_service_tg" {
+  name        = "patient-tg"
+  port        = 3002
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = aws_vpc.main.id
+}
+
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.main.arn
   port              = 80
   protocol          = "HTTP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.app_tg.arn
+    target_group_arn = aws_lb_target_group.appointment_service_tg.arn
   }
 }
 
 # -------------------------
-# ECS Service
+# ECS Services
 # -------------------------
 
-resource "aws_ecs_service" "service" {
-  name            = "fargate-service-hemanth"
+resource "aws_ecs_service" "appointment_service" {
+  name            = "appointment-service"
   cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.app.arn
+  task_definition = aws_ecs_task_definition.appointment_service_task.arn
   desired_count   = 1
   launch_type     = "FARGATE"
 
@@ -239,14 +240,28 @@ resource "aws_ecs_service" "service" {
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.app_tg.arn
-    container_name   = "phk-app-container"
-    container_port   = 80
+    target_group_arn = aws_lb_target_group.appointment_service_tg.arn
+    container_name   = "appointment-service-container"
+    container_port   = 3001
+  }
+}
+
+resource "aws_ecs_service" "patient_service" {
+  name            = "patient-service"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.patient_service_task.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets         = [aws_subnet.public_1.id, aws_subnet.public_2.id]
+    security_groups = [aws_security_group.ecs_sg.id]
+    assign_public_ip = true
   }
 
-  depends_on = [
-    aws_lb_listener.app_listener,
-    aws_iam_role_policy_attachment.ecs_exec_attach,
-    null_resource.docker_build_and_push
-  ]
+  load_balancer {
+    target_group_arn = aws_lb_target_group.patient_service_tg.arn
+    container_name   = "patient-service-container"
+    container_port   = 3002
+  }
 }
