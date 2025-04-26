@@ -151,6 +151,7 @@ resource "aws_lb" "app_lb" {
   load_balancer_type = "application"
   security_groups    = [aws_security_group.ecs_sg.id]
   subnets            = [aws_subnet.public.id]
+  subnets            = [aws_subnet.private.id]
 
   enable_deletion_protection = false
 
