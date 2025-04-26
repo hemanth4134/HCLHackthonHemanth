@@ -144,14 +144,16 @@ resource "aws_ecs_service" "app_service" {
 
   depends_on = [aws_iam_role_policy_attachment.ecs_exec_attach]
 }
-
 resource "aws_lb" "app_lb" {
-  name               = "ecs-app-lb-phk"
+  name               = "ecs-app-lb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.ecs_sg.id]
-  subnets            = [aws_subnet.public.id]
-  
+
+  subnets = [
+    aws_subnet.public.id,
+    aws_subnet.public_2.id
+  ]
 
   enable_deletion_protection = false
 
