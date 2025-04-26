@@ -266,7 +266,7 @@ resource "aws_ecs_service" "appointment_service" {
   name            = "appointment-phk"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.appointment_service_task.arn
-  desired_count   = 1
+  desired_count   = 2
   launch_type     = "FARGATE"
 
   network_configuration {
@@ -286,7 +286,7 @@ resource "aws_ecs_service" "patient_service" {
   name            = "patient-phk"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.patient_service_task.arn
-  desired_count   = 1
+  desired_count   = 2
   launch_type     = "FARGATE"
 
   network_configuration {
