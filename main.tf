@@ -206,3 +206,21 @@ resource "aws_ecs_service" "service" {
     aws_iam_role_policy_attachment.ecs_exec_attach
   ]
 }
+
+data "aws_caller_identity" "current" {}
+
+data "aws_region" "current" {}
+
+resource "null_resource" "docker_build_and_push" {
+  provisioner "local-exec" {
+    command = <<EOT
+      aws ecr get-login-password --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com
+      docker build -t my-app .
+      docker tag my-app:latest ${aws_ecr_repository.my_app.repository_url}:latest
+      docker push ${aws_ecr_repository.my_app.repository_url}:latest
+    EOT
+  }
+
+  depends_on = [aws_ecr_repository.my_app]
+}
+
