@@ -14,7 +14,7 @@ resource "aws_vpc" "main" {
 resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.main.id
   tags = {
-    Name = "main-gateway-phk@2"
+    Name = "main-gateway-hemanthfinal"
   }
 }
 
@@ -25,7 +25,7 @@ resource "aws_subnet" "public_1" {
   availability_zone       = "us-east-1a"
   map_public_ip_on_launch = true
   tags = {
-    Name = "public-subnet-1-phk@2"
+    Name = "public-subnet-1-hemanthfinal"
   }
 }
 
@@ -36,33 +36,35 @@ resource "aws_subnet" "public_2" {
   availability_zone       = "us-east-1b"
   map_public_ip_on_launch = true
   tags = {
-    Name = "public-subnet-2-phk@2"
+    Name = "public-subnet-2-hemanthfinal"
   }
 }
 
-# Private Subnet (optional for later)
+# Private Subnet (optional)
 resource "aws_subnet" "private" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.3.0/24"
-  availability_zone       = "us-east-1a"
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.3.0/24"
+  availability_zone = "us-east-1a"
   tags = {
-    Name = "private-subnet-phk@2"
+    Name = "private-subnet-hemanthfinal"
   }
 }
 
 # Public Route Table
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
+
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.gw.id
   }
+
   tags = {
-    Name = "public-route-table-phk@2"
+    Name = "public-route-table-hemanthfinal"
   }
 }
 
-# Associate Route Table to Public Subnets
+# Associate Public Subnets with Route Table
 resource "aws_route_table_association" "public_assoc_1" {
   subnet_id      = aws_subnet.public_1.id
   route_table_id = aws_route_table.public.id
@@ -73,23 +75,26 @@ resource "aws_route_table_association" "public_assoc_2" {
   route_table_id = aws_route_table.public.id
 }
 
-# Security Group
+# Security Group for ECS
 resource "aws_security_group" "ecs_sg" {
   vpc_id = aws_vpc.main.id
+
   ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
   tags = {
-    Name = "ecs-sg-phk"
+    Name = "ecs-sg-hemanthfinal"
   }
 }
 
@@ -100,7 +105,8 @@ resource "aws_ecs_cluster" "main" {
 
 # IAM Role for Task Execution
 resource "aws_iam_role" "ecs_task_exec_role" {
-  name = "ecsTaskExecutionRolephk12"
+  name = "ecsTaskExecutionRole-hemanth"
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
@@ -118,9 +124,39 @@ resource "aws_iam_role_policy_attachment" "ecs_exec_attach" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+# Create ECR Repository
+resource "aws_ecr_repository" "phk_app" {
+  name = "phk-app"
+}
+
+data "aws_caller_identity" "current" {}
+
+data "aws_region" "current" {}
+
+# Build and Push Docker Image
+resource "null_resource" "docker_build_and_push" {
+  provisioner "local-exec" {
+    command = <<EOT
+      echo "Logging into ECR..."
+      aws ecr get-login-password --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com
+
+      echo "Building Docker image..."
+      docker build -t phk-app .
+
+      echo "Tagging Docker image..."
+      docker tag phk-app:latest ${aws_ecr_repository.phk_app.repository_url}:latest
+
+      echo "Pushing Docker image to ECR..."
+      docker push ${aws_ecr_repository.phk_app.repository_url}:latest
+    EOT
+  }
+
+  depends_on = [aws_ecr_repository.phk_app]
+}
+
 # Task Definition
 resource "aws_ecs_task_definition" "app" {
-  family                   = "fargate-task"
+  family                   = "fargate-task-hemanth"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
@@ -128,14 +164,16 @@ resource "aws_ecs_task_definition" "app" {
   execution_role_arn       = aws_iam_role.ecs_task_exec_role.arn
 
   container_definitions = jsonencode([{
-    name      = "nginx-container",
-    image     = "nginx",
+    name      = "phk-app-container",
+    image     = "${aws_ecr_repository.phk_app.repository_url}:latest",
     portMappings = [{
       containerPort = 80,
       hostPort      = 80,
       protocol      = "tcp"
     }]
   }])
+
+  depends_on = [null_resource.docker_build_and_push]
 }
 
 # Load Balancer
@@ -146,6 +184,7 @@ resource "aws_lb" "app_lb" {
   security_groups    = [aws_security_group.ecs_sg.id]
   subnets            = [aws_subnet.public_1.id, aws_subnet.public_2.id]
   enable_deletion_protection = false
+
   tags = {
     Environment = "dev"
   }
@@ -153,7 +192,7 @@ resource "aws_lb" "app_lb" {
 
 # Target Group
 resource "aws_lb_target_group" "app_tg" {
-  name        = "ecs-app-tg12"
+  name        = "ecs-app-tg"
   port        = 80
   protocol    = "HTTP"
   target_type = "ip"
@@ -183,7 +222,7 @@ resource "aws_lb_listener" "app_listener" {
 
 # ECS Service
 resource "aws_ecs_service" "service" {
-  name            = "fargate-service"
+  name            = "fargate-service-hemanth"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.app.arn
   desired_count   = 1
@@ -197,33 +236,13 @@ resource "aws_ecs_service" "service" {
 
   load_balancer {
     target_group_arn = aws_lb_target_group.app_tg.arn
-    container_name   = "nginx-container"
+    container_name   = "phk-app-container"
     container_port   = 80
   }
 
   depends_on = [
     aws_lb_listener.app_listener,
-    aws_iam_role_policy_attachment.ecs_exec_attach
+    aws_iam_role_policy_attachment.ecs_exec_attach,
+    null_resource.docker_build_and_push
   ]
-}
-
-resource "aws_ecr_repository" "phk_app" {
-  name = "phk_app"
-}
-
-data "aws_caller_identity" "current" {}
-
-data "aws_region" "current" {}
-
-resource "null_resource" "docker_build_and_push" {
-  provisioner "local-exec" {
-    command = <<EOT
-      aws ecr get-login-password --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com
-      docker build -t phk_app .
-      docker tag phk_app:latest ${aws_ecr_repository.phk_app.repository_url}:latest
-      docker push ${aws_ecr_repository.phk_app.repository_url}:latest
-    EOT
-  }
-
-  depends_on = [aws_ecr_repository.phk_app]
 }
