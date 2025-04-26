@@ -46,7 +46,7 @@ Please find below screenshot for terraform plan and apply by using github action
 
 ![image](https://github.com/user-attachments/assets/6d0fae38-938a-44e3-b7e1-a55bb25b9d24)
 
-
+Note:- Code given @evening
 
 
 
