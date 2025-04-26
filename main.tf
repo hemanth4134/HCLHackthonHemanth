@@ -8,12 +8,16 @@ provider "aws" {
 
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
-  tags = { Name = "main-vpc-hemanthfinal" }
+  tags = {
+    Name = "main-vpc-hemanthfinal"
+  }
 }
 
 resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.main.id
-  tags = { Name = "main-gateway-hemanthfinal" }
+  tags = {
+    Name = "main-gateway-hemanthfinal"
+  }
 }
 
 resource "aws_subnet" "public_1" {
@@ -21,7 +25,9 @@ resource "aws_subnet" "public_1" {
   cidr_block              = "10.0.1.0/24"
   availability_zone       = "us-east-1a"
   map_public_ip_on_launch = true
-  tags = { Name = "public-subnet-1-hemanthfinal" }
+  tags = {
+    Name = "public-subnet-1-hemanthfinal"
+  }
 }
 
 resource "aws_subnet" "public_2" {
@@ -29,7 +35,9 @@ resource "aws_subnet" "public_2" {
   cidr_block              = "10.0.2.0/24"
   availability_zone       = "us-east-1b"
   map_public_ip_on_launch = true
-  tags = { Name = "public-subnet-2-hemanthfinal" }
+  tags = {
+    Name = "public-subnet-2-hemanthfinal"
+  }
 }
 
 resource "aws_route_table" "public" {
@@ -40,7 +48,9 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.gw.id
   }
 
-  tags = { Name = "public-route-table-hemanthfinal" }
+  tags = {
+    Name = "public-route-table-hemanthfinal"
+  }
 }
 
 resource "aws_route_table_association" "public_assoc_1" {
@@ -74,7 +84,9 @@ resource "aws_security_group" "ecs_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "ecs-sg-hemanthfinal" }
+  tags = {
+    Name = "ecs-sg-hemanthfinal"
+  }
 }
 
 # -------------------------
@@ -96,7 +108,9 @@ resource "aws_iam_role" "ecs_task_exec_role" {
     Version = "2012-10-17",
     Statement = [{
       Effect = "Allow",
-      Principal = { Service = "ecs-tasks.amazonaws.com" },
+      Principal = {
+        Service = "ecs-tasks.amazonaws.com"
+      },
       Action = "sts:AssumeRole"
     }]
   })
@@ -107,11 +121,6 @@ resource "aws_iam_role_policy_attachment" "ecs_exec_attach" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-
-# resource "aws_iam_role_policy_attachment" "ecs_exec_attach" {
-#   role       = aws_iam_role.ecs_task_execution_role.name
-#   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-# }
 # -------------------------
 # ECR Repositories
 # -------------------------
@@ -165,7 +174,10 @@ resource "aws_ecs_task_definition" "appointment_service_task" {
   container_definitions = jsonencode([{
     name  = "appointment-phk-container",
     image = "${aws_ecr_repository.appointment_service.repository_url}:latest",
-    portMappings = [{ containerPort = 3001, protocol = "tcp" }]
+    portMappings = [{
+      containerPort = 3001,
+      protocol      = "tcp"
+    }]
   }])
 
   depends_on = [null_resource.docker_build_and_push_appointment_service]
@@ -182,7 +194,10 @@ resource "aws_ecs_task_definition" "patient_service_task" {
   container_definitions = jsonencode([{
     name  = "patient-phk-container",
     image = "${aws_ecr_repository.patient_service.repository_url}:latest",
-    portMappings = [{ containerPort = 3002, protocol = "tcp" }]
+    portMappings = [{
+      containerPort = 3002,
+      protocol      = "tcp"
+    }]
   }])
 
   depends_on = [null_resource.docker_build_and_push_patient_service]
