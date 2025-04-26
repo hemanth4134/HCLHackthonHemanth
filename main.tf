@@ -110,7 +110,7 @@ resource "aws_ecs_cluster" "main" {
 
 # IAM Role for ECS Task Execution
 resource "aws_iam_role" "ecs_task_exec_role" {
-  name = "ecsTaskExecutionRole"
+  name = "ecsTaskExecutionRolephk"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
@@ -171,12 +171,7 @@ resource "aws_lb" "app_lb" {
 }
 
 # Target Group
-resource "aws_lb_target_group" "app_tg" {
-  name        = "ecs-app-tg"
-  port        = 80
-  protocol    = "HTTP"
-  target_type = "ip"
-  vpc_id      = aws_vpc.main.id
+
 
   health_check {
     path                = "/"
