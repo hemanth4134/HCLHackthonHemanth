@@ -130,7 +130,7 @@ resource "aws_ecs_task_definition" "app" {
 
 # ECS Service
 resource "aws_ecs_service" "app_service" {
-  name            = "fargate-service"
+  name            = "fargate-service-hemanth"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.app.arn
   desired_count   = 1
@@ -146,7 +146,7 @@ resource "aws_ecs_service" "app_service" {
 }
 
 resource "aws_lb" "app_lb" {
-  name               = "ecs-app-lb"
+  name               = "ecs-app-lb-phk"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.ecs_sg.id]
