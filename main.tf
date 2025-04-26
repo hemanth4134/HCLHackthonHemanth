@@ -1,5 +1,5 @@
 provider "aws" {
-  region = "us-east-1" # Change this to your preferred region
+  region = "us-east-1"
 }
 
 # Create VPC
@@ -16,32 +16,46 @@ resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "main-gatewayphk"
+    Name = "main-gateway-phk"
   }
 }
 
-# Create Public Subnet
-resource "aws_subnet" "public" {
+# Create Public Subnet 1 (AZ a)
+resource "aws_subnet" "public_1" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"
+  availability_zone       = "us-east-1a"
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "public-subnetphk"
+    Name = "public-subnet-1-phk"
+  }
+}
+
+# Create Public Subnet 2 (AZ b)
+resource "aws_subnet" "public_2" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.2.0/24"
+  availability_zone       = "us-east-1b"
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "public-subnet-2-phk"
   }
 }
 
 # Create Private Subnet
 resource "aws_subnet" "private" {
   vpc_id     = aws_vpc.main.id
-  cidr_block = "10.0.2.0/24"
+  cidr_block = "10.0.3.0/24"
+  availability_zone = "us-east-1a"
 
   tags = {
-    Name = "private-subnetphk"
+    Name = "private-subnet-phk"
   }
 }
 
-# Create Public Route Table
+# Public Route Table
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
@@ -51,17 +65,22 @@ resource "aws_route_table" "public" {
   }
 
   tags = {
-    Name = "public-route-tablephk"
+    Name = "public-route-table-phk"
   }
 }
 
-# Associate Public Subnet with Route Table
-resource "aws_route_table_association" "public_assoc" {
-  subnet_id      = aws_subnet.public.id
+# Associate Public Subnets with Route Table
+resource "aws_route_table_association" "public_assoc_1" {
+  subnet_id      = aws_subnet.public_1.id
   route_table_id = aws_route_table.public.id
 }
 
-# Security Group
+resource "aws_route_table_association" "public_assoc_2" {
+  subnet_id      = aws_subnet.public_2.id
+  route_table_id = aws_route_table.public.id
+}
+
+# Security Group for ECS and Load Balancer
 resource "aws_security_group" "ecs_sg" {
   vpc_id = aws_vpc.main.id
 
@@ -78,28 +97,32 @@ resource "aws_security_group" "ecs_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  tags = {
+    Name = "ecs-sg-phk"
+  }
 }
 
 # ECS Cluster
 resource "aws_ecs_cluster" "main" {
-  name = "Hemanth-fargate-cluster"
+  name = "hemanth-fargate-cluster"
 }
 
-# IAM Role for Fargate task
-#resource "aws_iam_role" "ecs_task_exec_role" {
- # name = "ecsTaskExecutionRole"
+# IAM Role for ECS Task Execution
+resource "aws_iam_role" "ecs_task_exec_role" {
+  name = "ecsTaskExecutionRole"
 
-  #assume_role_policy = jsonencode({
-   # Version = "2012-10-17",
-    #Statement = [{
-     # Effect = "Allow",
-      #Principal = {
-       # Service = "ecs-tasks.amazonaws.com"
-      #},
-      #Action = "sts:AssumeRole"
-    #}]
-  #})
-#}
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Principal = {
+        Service = "ecs-tasks.amazonaws.com"
+      },
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
 
 resource "aws_iam_role_policy_attachment" "ecs_exec_attach" {
   role       = aws_iam_role.ecs_task_exec_role.name
@@ -117,7 +140,7 @@ resource "aws_ecs_task_definition" "app" {
 
   container_definitions = jsonencode([
     {
-      name      = "hello-app-hemanth",
+      name      = "nginx-container",
       image     = "nginx",
       portMappings = [{
         containerPort = 80,
@@ -128,22 +151,7 @@ resource "aws_ecs_task_definition" "app" {
   ])
 }
 
-# ECS Service
-resource "aws_ecs_service" "app_service" {
-  name            = "fargate-service-hemanth"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.app.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
-
-  network_configuration {
-    subnets         = [aws_subnet.public.id]
-    security_groups = [aws_security_group.ecs_sg.id]
-    assign_public_ip = true
-  }
-
-  depends_on = [aws_iam_role_policy_attachment.ecs_exec_attach]
-}
+# Application Load Balancer
 resource "aws_lb" "app_lb" {
   name               = "ecs-app-lb"
   internal           = false
@@ -151,7 +159,7 @@ resource "aws_lb" "app_lb" {
   security_groups    = [aws_security_group.ecs_sg.id]
 
   subnets = [
-    aws_subnet.public.id,
+    aws_subnet.public_1.id,
     aws_subnet.public_2.id
   ]
 
@@ -162,11 +170,12 @@ resource "aws_lb" "app_lb" {
   }
 }
 
+# Target Group
 resource "aws_lb_target_group" "app_tg" {
   name        = "ecs-app-tg"
   port        = 80
   protocol    = "HTTP"
-  target_type = "ip"  # Important for FARGATE (use IP mode)
+  target_type = "ip"
   vpc_id      = aws_vpc.main.id
 
   health_check {
@@ -179,6 +188,7 @@ resource "aws_lb_target_group" "app_tg" {
   }
 }
 
+# Listener
 resource "aws_lb_listener" "app_listener" {
   load_balancer_arn = aws_lb.app_lb.arn
   port              = 80
@@ -190,7 +200,7 @@ resource "aws_lb_listener" "app_listener" {
   }
 }
 
-
+# ECS Service with Load Balancer
 resource "aws_ecs_service" "service" {
   name            = "fargate-service"
   cluster         = aws_ecs_cluster.main.id
@@ -199,9 +209,9 @@ resource "aws_ecs_service" "service" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = [aws_subnet.public.id]
+    subnets         = [aws_subnet.public_1.id, aws_subnet.public_2.id]
     security_groups = [aws_security_group.ecs_sg.id]
-    assign_public_ip = true  # keep it true to let tasks get IP
+    assign_public_ip = true
   }
 
   load_balancer {
@@ -215,4 +225,3 @@ resource "aws_ecs_service" "service" {
     aws_iam_role_policy_attachment.ecs_exec_attach
   ]
 }
-
