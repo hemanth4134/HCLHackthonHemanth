@@ -125,11 +125,11 @@ resource "aws_iam_role_policy_attachment" "ecs_exec_attach" {
 # ECR Repositories
 # -------------------------
 
-resource "aws_ecr_repository" "phk2_appointment_service" {
+resource "aws_ecr_repository" "appointment_service" {
   name = "appointment-phk"
 }
 
-resource "aws_ecr_repository" "phk2_patient_service" {
+resource "aws_ecr_repository" "patient_service" {
   name = "patient-phk"
 }
 
@@ -246,7 +246,7 @@ resource "aws_lb_listener" "http" {
 # ECS Services
 # -------------------------
 
-resource "aws_ecs_service" "phk_appointment_service" {
+resource "aws_ecs_service" "appointment_service" {
   name            = "appointment-phk"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.appointment_service_task.arn
@@ -266,7 +266,7 @@ resource "aws_ecs_service" "phk_appointment_service" {
   }
 }
 
-resource "aws_ecs_service" "phk_patient_service" {
+resource "aws_ecs_service" "patient_service" {
   name            = "patient-phk"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.patient_service_task.arn
