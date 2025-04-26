@@ -1,1 +1,0 @@
-# output "repository_url" { value = hcldemo.app_repo.539935451710.dkr.ecr.us-east-1.amazonaws.com/hcldemo }
