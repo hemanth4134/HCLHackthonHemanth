@@ -207,6 +207,9 @@ resource "aws_ecs_service" "service" {
   ]
 }
 
+resource "aws_ecr_repository" "app" {
+  name = "app"
+}
 data "aws_caller_identity" "current" {}
 
 data "aws_region" "current" {}
