@@ -144,3 +144,72 @@ resource "aws_ecs_service" "app_service" {
 
   depends_on = [aws_iam_role_policy_attachment.ecs_exec_attach]
 }
+
+resource "aws_lb" "app_lb" {
+  name               = "ecs-app-lb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.ecs_sg.id]
+  subnets            = [aws_subnet.public.id]
+
+  enable_deletion_protection = false
+
+  tags = {
+    Environment = "dev"
+  }
+}
+
+resource "aws_lb_target_group" "app_tg" {
+  name        = "ecs-app-tg"
+  port        = 80
+  protocol    = "HTTP"
+  target_type = "ip"  # Important for FARGATE (use IP mode)
+  vpc_id      = aws_vpc.main.id
+
+  health_check {
+    path                = "/"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    matcher             = "200"
+  }
+}
+
+resource "aws_lb_listener" "app_listener" {
+  load_balancer_arn = aws_lb.app_lb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app_tg.arn
+  }
+}
+
+
+resource "aws_ecs_service" "service" {
+  name            = "fargate-service"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.app.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets         = [aws_subnet.public.id]
+    security_groups = [aws_security_group.ecs_sg.id]
+    assign_public_ip = true  # keep it true to let tasks get IP
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.app_tg.arn
+    container_name   = "nginx-container"
+    container_port   = 80
+  }
+
+  depends_on = [
+    aws_lb_listener.app_listener,
+    aws_iam_role_policy_attachment.ecs_exec_attach
+  ]
+}
+
