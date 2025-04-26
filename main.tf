@@ -125,11 +125,11 @@ resource "aws_iam_role_policy_attachment" "ecs_exec_attach" {
 # ECR Repositories
 # -------------------------
 
-resource "aws_ecr_repository" "phk2_appointment_service" {
+resource "aws_ecr_repository" "appointment_service" {
   name = "appointment-phk"
 }
 
-resource "aws_ecr_repository" "phk2_patient_service" {
+resource "aws_ecr_repository" "patient_service" {
   name = "patient-phk"
 }
 
