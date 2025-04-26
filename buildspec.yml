@@ -1,0 +1,23 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+    commands:
+      - echo Installing dependencies...
+      - npm install
+  build:
+    commands:
+      - echo Building project...
+      - npm run build
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 539935451710.dkr.ecr.us-east-1.amazonaws.com
+      - docker build -t phk_app .
+      - docker tag phk_app:latest 539935451710.dkr.ecr.us-east-1.amazonaws.com/phk_app:latest
+      - docker push 539935451710.dkr.ecr.us-east-1.amazonaws.com/phk_app:latest
+  post_build:
+    commands:
+      - echo Build completed successfully!
+artifacts:
+  files:
+    - '**/*'

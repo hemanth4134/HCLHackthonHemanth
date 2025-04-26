@@ -125,34 +125,65 @@ resource "aws_iam_role_policy_attachment" "ecs_exec_attach" {
 }
 
 # Create ECR Repository
-resource "aws_ecr_repository" "phk_app" {
-  name = "phk-app"
-}
+# resource "aws_ecr_repository" "phk_app" {
+#   name = "phk-app"
+# }
 
-data "aws_caller_identity" "current" {}
+# data "aws_caller_identity" "current" {}
 
-data "aws_region" "current" {}
+# data "aws_region" "current" {}
 
-# Build and Push Docker Image
-resource "null_resource" "docker_build_and_push" {
-  provisioner "local-exec" {
-    command = <<EOT
-      echo "Logging into ECR..."
-      aws ecr get-login-password --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com
+# # Build and Push Docker Image
+# resource "null_resource" "docker_build_and_push" {
+#   provisioner "local-exec" {
+#     command = <<EOT
+#       echo "Logging into ECR..."
+#       aws ecr get-login-password --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com
 
-      echo "Building Docker image..."
-      docker build -t phk-app .
+#       echo "Building Docker image..."
+#       docker build -t phk-app .
 
-      echo "Tagging Docker image..."
-      docker tag phk-app:latest ${aws_ecr_repository.phk_app.repository_url}:latest
+#       echo "Tagging Docker image..."
+#       docker tag phk-app:latest ${aws_ecr_repository.phk_app.repository_url}:latest
 
-      echo "Pushing Docker image to ECR..."
-      docker push ${aws_ecr_repository.phk_app.repository_url}:latest
-    EOT
+#       echo "Pushing Docker image to ECR..."
+#       docker push ${aws_ecr_repository.phk_app.repository_url}:latest
+#     EOT
+#   }
+
+#   depends_on = [aws_ecr_repository.phk_app]
+# }
+
+resource "aws_codebuild_project" "phk_app_build" {
+  name          = "phk-app-build"
+  service_role  = aws_iam_role.codebuild_role.arn
+  artifacts {
+    type = "NO_ARTIFACTS"
   }
 
-  depends_on = [aws_ecr_repository.phk_app]
+  environment {
+    compute_type                = "BUILD_GENERAL1_SMALL"
+    image                       = "aws/codebuild/standard:7.0" # Amazon-provided Docker image
+    type                        = "LINUX_CONTAINER"
+    privileged_mode             = true
+  }
+
+  source {
+    type            = "GITHUB" # or "CODECOMMIT" or "S3"
+    location        = "https://github.com/your-repo/phk-app.git"
+    buildspec       = "buildspec.yml"  # 👈 here we call buildspec.yml
+  }
+
+  environment_variables {
+    name  = "ENVIRONMENT"
+    value = "dev"
+  }
+
+  tags = {
+    Environment = "dev"
+  }
 }
+
 
 # Task Definition
 resource "aws_ecs_task_definition" "app" {
