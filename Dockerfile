@@ -1,12 +1,5 @@
-# Use an official Python runtime as a parent image
-FROM python:3.9-slim
-
-# Set the working directory in the container
+FROM node:18
 WORKDIR /app
-
-# Copy the current directory contents into the container at /app
-COPY . /app
-
-# Run the hello.py script when the container launches
-CMD ["python", "hello world"]
-
+COPY . .
+RUN npm install
+CMD ["npm", "start"]
