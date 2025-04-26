@@ -1,0 +1,78 @@
+# name: Infra Provisioning through Terraform
+
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       environment:
+#         description: "Environment to deploy (eg..., dev, staging, prod)"
+#         required: true
+#         default: "dev"
+#         type: choice
+#         options:
+#         - dev
+#         - staging
+#         - prod
+
+#   push:
+#     branches:
+#       - main
+#   pull_request:
+#     branches:
+#       - main
+      
+# permissions:
+#   contents: read
+#   pull-requests: write   
+#   id-token: write  
+
+# jobs:
+#   terraform:
+#     name: Terraform Deployment
+#     runs-on: ubuntu-latest
+#     steps:
+    
+#       # Step 1: Checkout Code
+#       - name: Checkout Code
+#         uses: actions/checkout@v3
+
+#       # Step 2: Set up Terraform
+#       - name: Set up Terraform
+#         uses: hashicorp/setup-terraform@v2
+#         with:
+#           terraform_version: 1.6.0
+
+#       # Step 3: Configure AWS Credentials
+#       - name: Configure AWS Credentials
+#         uses: aws-actions/configure-aws-credentials@v2
+#         with:
+#           role-to-assume: arn:aws:iam::720682856456:role/github-actions-role
+#           role-session-name: GitHubActions
+#           aws-region: us-east-1
+
+#       # Step 4: Install TFLint for Terraform Linting
+#       - name: Install TFLint
+#         run: |
+#           curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install.sh | bash
+
+#       # Step 5: Run TFLint to Check for Terraform Issues
+#       - name: Run TFLint
+#         run: |
+#           tflint --init
+#           tflint
+
+#       # Step 6: Terraform Initialization
+#       - name: Terraform Init
+#         run: terraform init
+
+#       # Step 7: Terraform Format Check
+#       - name: Terraform Format Check
+#         run: terraform fmt -check
+
+#       # Step 8: Terraform Plan
+#       - name: Terraform Plan
+#         run: terraform plan -var-file="env/${{ github.event.inputs.environment }}.tfvars"
+
+#       # Step 9: Terraform Apply (Only on Push to Main)
+#       - name: Terraform Apply
+#         if: github.ref == 'refs/heads/main'
+#         run: terraform apply -auto-approve -var-file="env/${{ github.event.inputs.environment }}.tfvars"
