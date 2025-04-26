@@ -1,13 +1,12 @@
 provider "aws" {
   region = "us-east-1"
-  profile = "hemanth"
 }
 
 # VPC
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
   tags = {
-    Name = "main-vpc-hemanth"
+    Name = "main-vpc-hemanthfinal"
   }
 }
 
@@ -15,7 +14,7 @@ resource "aws_vpc" "main" {
 resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.main.id
   tags = {
-    Name = "main-gateway-phk"
+    Name = "main-gateway-phk@2"
   }
 }
 
@@ -26,7 +25,7 @@ resource "aws_subnet" "public_1" {
   availability_zone       = "us-east-1a"
   map_public_ip_on_launch = true
   tags = {
-    Name = "public-subnet-1-phk"
+    Name = "public-subnet-1-phk@2"
   }
 }
 
@@ -37,7 +36,7 @@ resource "aws_subnet" "public_2" {
   availability_zone       = "us-east-1b"
   map_public_ip_on_launch = true
   tags = {
-    Name = "public-subnet-2-phk"
+    Name = "public-subnet-2-phk@2"
   }
 }
 
@@ -47,7 +46,7 @@ resource "aws_subnet" "private" {
   cidr_block              = "10.0.3.0/24"
   availability_zone       = "us-east-1a"
   tags = {
-    Name = "private-subnet-phk"
+    Name = "private-subnet-phk@2"
   }
 }
 
@@ -59,7 +58,7 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.gw.id
   }
   tags = {
-    Name = "public-route-table-phk"
+    Name = "public-route-table-phk@2"
   }
 }
 
