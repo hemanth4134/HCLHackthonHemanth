@@ -237,8 +237,44 @@ resource "aws_lb_listener" "http" {
   protocol          = "HTTP"
 
   default_action {
+    type = "fixed-response"
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "Not Found"
+      status_code  = "404"
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "appointment_rule" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 100
+
+  action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.appointment_service_tg.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/appointment*"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "patient_rule" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 200
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.patient_service_tg.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/patient*"]
+    }
   }
 }
 
