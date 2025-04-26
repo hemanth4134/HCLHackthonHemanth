@@ -2,7 +2,7 @@
 FROM node:20-alpine
 
 # Set working directory inside the container
-WORKDIR /app
+WORKDIR /hello-world-express-phk
 
 # Copy package.json and package-lock.json first
 COPY package*.json ./
