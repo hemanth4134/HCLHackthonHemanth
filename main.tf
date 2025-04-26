@@ -196,7 +196,7 @@ resource "aws_lb" "main" {
 }
 
 resource "aws_lb_target_group" "appointment_service_tg" {
-  name        = "appointment-tg"
+  name        = "phk-appointment-tg"
   port        = 3001
   protocol    = "HTTP"
   target_type = "ip"
@@ -204,7 +204,7 @@ resource "aws_lb_target_group" "appointment_service_tg" {
 }
 
 resource "aws_lb_target_group" "patient_service_tg" {
-  name        = "patient-tg"
+  name        = "phk-patient-tg"
   port        = 3002
   protocol    = "HTTP"
   target_type = "ip"
