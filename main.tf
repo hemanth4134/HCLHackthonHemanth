@@ -100,7 +100,7 @@ resource "aws_ecs_cluster" "main" {
 
 # IAM Role for Task Execution
 resource "aws_iam_role" "ecs_task_exec_role" {
-  name = "ecsTaskExecutionRolephk"
+  name = "ecsTaskExecutionRolephk12"
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
@@ -153,7 +153,7 @@ resource "aws_lb" "app_lb" {
 
 # Target Group
 resource "aws_lb_target_group" "app_tg" {
-  name        = "ecs-app-tg"
+  name        = "ecs-app-tg12"
   port        = 80
   protocol    = "HTTP"
   target_type = "ip"
