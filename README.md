@@ -42,6 +42,11 @@ Please find below screenshot of AWS ECS with Fargate
 
 ![image](https://github.com/user-attachments/assets/da5be30c-2700-476b-8563-9f63c9b04fff)
 
+Please find below screenshot for terraform plan and apply by using github actions
+
+![image](https://github.com/user-attachments/assets/6d0fae38-938a-44e3-b7e1-a55bb25b9d24)
+
+
 
 
 
