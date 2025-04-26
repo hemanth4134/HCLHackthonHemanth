@@ -1,7 +1,11 @@
-exports.handler = async (event) => {
-    const response = {
-        statusCode: 200,
-        body: JSON.stringify("Hello, World!"),
-    };
-    return response;
-};
+const express = require('express');
+const app = express();
+const port = 3000;
+
+app.get('/', (req, res) => {
+    res.status(200).json("Hello, World!");
+});
+
+app.listen(port, () => {
+    console.log(`Server is running on http://localhost:3000`);
+});
